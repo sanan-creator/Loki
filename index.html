@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#020905">
+  <meta name="description" content="Loki">
+  <title>Loki</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="icon" href="favicon-64.png?v=11" type="image/png" sizes="64x64">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css?v=11">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand"><div class="brand-mark"><img src="icon-192.png" alt="Loki gold horned L emblem"></div><div><b>LOKI</b></div></div>
+      <div class="nav-label" data-i18n="workspace">فضای کاری</div>
+      <nav id="nav">
+        <button class="nav-item active" data-page="dashboard"><span>◈</span><span data-i18n="dashboard">داشبورد</span></button>
+        <button class="nav-item" data-page="tasks"><span>▤</span><span data-i18n="tasks">کارها</span><em id="taskCount">0</em></button>
+        <button class="nav-item" data-page="routines"><span>⟳</span><span data-i18n="routines">روتین‌ها</span></button>
+        <button class="nav-item" data-page="calendar"><span>▦</span><span data-i18n="calendar">تقویم شمسی</span></button>
+        <button class="nav-item" data-page="assistant"><span>✧</span><span data-i18n="assistant">دستیار Loki</span></button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="storage-state"><span class="pulse"></span><span data-i18n="localStorage">ذخیره‌سازی محلی فعال</span></div>
+        <button class="nav-item" data-page="settings"><span>⚙</span><span data-i18n="settings">تنظیمات</span></button>
+        <div class="profile"><div class="avatar"><img src="icon-192.png" alt="Loki gold horned L emblem"></div><div><b>Loki</b><small data-i18n="yourWorkspace">فضای شخصی شما</small></div><span class="profile-dot"></span></div>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <button class="icon-btn mobile-menu" id="menuBtn" aria-label="Menu">☰</button>
+        <div><div class="eyebrow" id="todayLabel">LOKI / OVERVIEW</div><h1 id="pageTitle">داشبورد</h1></div>
+        <div class="top-actions"><span class="date-chip" id="headerDate"></span><button class="icon-btn" id="themeBtn" title="Theme">◐</button><button class="primary-btn" id="quickAdd">＋ <span data-i18n="newTask">کار جدید</span></button></div>
+      </header>
+      <section id="page" class="page"></section>
+      <footer><span>LOKI</span><span data-i18n="footer">ساخته‌شده برای نظم بیشتر، قدم‌به‌قدم.</span><span class="version">V1.0 · LOCAL FIRST</span></footer>
+    </main>
+  </div>
+  <div class="toast" id="toast"></div>
+  <dialog id="itemDialog" class="modal">
+    <form id="itemForm" method="dialog">
+      <div class="modal-head"><div><span class="eyebrow" id="modalEyebrow">LOKI / NEW</span><h2 id="modalTitle">کار جدید</h2></div><button type="button" class="icon-btn" id="closeModal">✕</button></div>
+      <input type="hidden" id="itemId">
+      <div class="field"><label for="itemTitle" data-i18n="title">عنوان</label><input id="itemTitle" required maxlength="90" placeholder="مثلاً مطالعه فصل اول"></div>
+      <div class="field"><label for="itemNotes" data-i18n="notes">توضیحات</label><textarea id="itemNotes" rows="2" placeholder="جزئیات بیشتر..."></textarea></div>
+      <div class="form-grid">
+        <div class="field"><label for="itemCategory" data-i18n="category">دسته‌بندی</label><select id="itemCategory"><option value="personal">شخصی</option><option value="study">درس</option><option value="work">کار</option><option value="health">سلامت</option></select></div>
+        <div class="field" id="priorityField"><label for="itemPriority" data-i18n="priority">اولویت</label><select id="itemPriority"><option value="normal">معمولی</option><option value="high">بالا</option><option value="urgent">ضروری</option></select></div>
+      </div>
+      <div class="form-grid" id="taskFields">
+        <div class="field"><label for="itemDate" data-i18n="date">تاریخ (شمسی)</label><input id="itemDate" type="date"></div>
+        <div class="field"><label for="itemTime" data-i18n="time">ساعت</label><input id="itemTime" type="time"></div>
+      </div>
+      <div class="field hidden" id="routineFields">
+        <label data-i18n="repeat">تکرار</label>
+        <select id="routineRepeat"><option value="daily">هر روز</option><option value="weekdays">روزهای انتخابی هفته</option><option value="weekly">هر هفته</option><option value="monthly">ماهانه</option></select>
+        <div class="weekday-picks" id="weekdayPicks">
+          <label><input type="checkbox" value="6"> ش</label><label><input type="checkbox" value="0"> ی</label><label><input type="checkbox" value="1"> د</label><label><input type="checkbox" value="2"> س</label><label><input type="checkbox" value="3"> چ</label><label><input type="checkbox" value="4"> پ</label><label><input type="checkbox" value="5"> ج</label>
+        </div>
+        <label class="check-row"><input type="checkbox" id="routineConfirm"> <span data-i18n="confirmCompletion">برای این روتین تأیید انجام‌شدن هم داشته باش</span></label>
+      </div>
+      <div class="modal-actions"><button type="button" class="secondary-btn" id="cancelModal" data-i18n="cancel">انصراف</button><button type="submit" class="primary-btn" id="saveItem" data-i18n="save">ذخیره</button></div>
+    </form>
+  </dialog>
+  <script src="app.js?v=15"></script>
+</body>
+</html>
