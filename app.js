@@ -176,24 +176,35 @@
     if (!db) return false;
     return new Promise(resolve => {
       try {
-        const store = db.transaction('snapshots', 'readonly').objectStore('snapshots');
-        // A guest snapshot is keyed as "guest" in current builds. Keep "main"
-        // as a compatibility fallback for older installations.
-        if (localStorage.getItem('loki_first_account_uid_v1')) return resolve(false);
+        const snapshotStore = db.transaction('snapshots', 'readonly').objectStore('snapshots');
+        // Once an account has been used, the old guest snapshot may contain a
+        // copy of the first account's migrated data. Never restore it after
+        // sign-out or on a logged-out launch.
+        const legacyAllowed = !localStorage.getItem('loki_first_account_uid_v1');
+        if (!legacyAllowed) return resolve(false);
+        // Current snapshots are keyed by the active workspace UID (or
+        // `guest`). Older builds may have written `main`, so retain that
+        // legacy fallback without ever restoring it after an account was used.
+        const request = snapshotStore.get('guest');
+        request.onsuccess = () => {
+          if (applyRestoredSnapshot(request.result)) return resolve(true);
+          // Some early builds used `main`; fall back when the newer guest key
+          // is absent or empty so an empty bootstrap snapshot cannot mask it.
+          const legacyRequest = snapshotStore.get('main');
+          legacyRequest.onsuccess = () => resolve(applyRestoredSnapshot(legacyRequest.result));
+          legacyRequest.onerror = () => resolve(false);
+        };
+        request.onerror = () => resolve(false);
 
-        const restore = saved => {
-          if (!saved || !Array.isArray(saved.tasks) || !Array.isArray(saved.routines)) return resolve(false);
+        function applyRestoredSnapshot(saved) {
+          if (!saved || !Array.isArray(saved.tasks) || !Array.isArray(saved.routines)) return false;
           const localHasData = tasks.length || routines.length;
-          const savedHasData = saved.tasks.length || saved.routines.length;
-          if (localHasData || (!savedHasData && !saved.settings)) return resolve(false);
-
+          if (localHasData || (!saved.tasks.length && !saved.routines.length)) return false;
           tasks = normalizeRecords(saved.tasks);
           routines = normalizeRecords(saved.routines);
-          if (Array.isArray(saved.deletions)) {
-            deletions = saved.deletions.map(item => ({
-              ...item, id: String(item.id), deletedAt: toMillis(item.deletedAt, 0)
-            }));
-          }
+          if (Array.isArray(saved.deletions)) deletions = saved.deletions.map(item => ({
+            ...item, id: String(item.id), deletedAt: toMillis(item.deletedAt, 0)
+          }));
           if (saved.settings && typeof saved.settings === 'object') settings = { ...settings, ...saved.settings };
           settingsUpdatedAt = Number(saved.settingsUpdatedAt || settingsUpdatedAt);
           persistedSettingsJson = JSON.stringify(settings);
@@ -202,17 +213,8 @@
           localStorage.setItem(KEYS.routines, JSON.stringify(routines));
           localStorage.setItem(KEYS.deletions, JSON.stringify(deletions));
           localStorage.setItem(KEYS.settings, JSON.stringify(settings));
-          return resolve(true);
-        };
-
-        const request = store.get('guest');
-        request.onsuccess = () => {
-          if (request.result) return restore(request.result);
-          const legacy = store.get('main');
-          legacy.onsuccess = () => restore(legacy.result);
-          legacy.onerror = () => resolve(false);
-        };
-        request.onerror = () => resolve(false);
+          return true;
+        }
       } catch (_) { resolve(false); }
     });
   }
@@ -277,17 +279,9 @@
       persistedSettingsJson = nextSettingsJson;
       localStorage.setItem('loki_settings_updated_at_v1', String(settingsUpdatedAt));
     }
-    try {
-      writeBaseWorkspace();
-      saveWorkspaceScope(activeWorkspaceUid || 'guest');
-    } catch (error) {
-      console.error('LOKI LOCAL SAVE ERROR:', error);
-      showToast(text(
-        'ذخیره محلی انجام نشد؛ فضای ذخیره‌سازی مرورگر را بررسی کن.',
-        'Local save failed. Check the browser storage space.'
-      ));
-    }
-    writeIndexedSnapshot().catch(error => console.warn('Loki IndexedDB snapshot failed:', error));
+    writeBaseWorkspace();
+    saveWorkspaceScope(activeWorkspaceUid || 'guest');
+    writeIndexedSnapshot();
     queueCloudSync(Boolean(options.immediateCloudSync));
   }
 
@@ -1929,10 +1923,51 @@
 
     } catch (error) {
       console.error('LOKI AUTH INIT ERROR:',error);
+      showToast(text(
+        'اتصال به سرویس حساب کاربری برقرار نشد. اتصال اینترنت و تنظیمات Firebase را بررسی کن.',
+        'Could not initialize account services. Check connectivity and Firebase configuration.'
+      ));
     }
   }
 
   
+
+
+  function firebaseAuthErrorMessage(error, action = 'signin') {
+    const code = String(error?.code || '');
+    const fa = {
+      'auth/invalid-email': 'آدرس ایمیل معتبر نیست.',
+      'auth/user-disabled': 'این حساب غیرفعال شده است.',
+      'auth/user-not-found': 'حسابی با این ایمیل پیدا نشد.',
+      'auth/wrong-password': 'رمز عبور اشتباه است.',
+      'auth/invalid-credential': 'ایمیل یا رمز عبور صحیح نیست.',
+      'auth/email-already-in-use': 'این ایمیل قبلاً ثبت‌نام شده است.',
+      'auth/weak-password': 'رمز عبور ضعیف است؛ حداقل ۶ نویسه وارد کن.',
+      'auth/too-many-requests': 'تلاش‌های ناموفق زیاد بوده؛ کمی بعد دوباره امتحان کن.',
+      'auth/network-request-failed': 'ارتباط با سرور Firebase برقرار نشد؛ اتصال اینترنت و دسترسی به سرویس‌های Google را بررسی کن.',
+      'auth/operation-not-allowed': 'ورود با ایمیل و رمز عبور در Firebase فعال نیست.',
+      'auth/unauthorized-domain': 'دامنه فعلی در Firebase مجاز نشده است.',
+      'auth/invalid-api-key': 'کلید یا تنظیمات Firebase معتبر نیست.'
+    };
+    const en = {
+      'auth/invalid-email': 'The email address is invalid.',
+      'auth/user-disabled': 'This account has been disabled.',
+      'auth/user-not-found': 'No account was found for this email.',
+      'auth/wrong-password': 'The password is incorrect.',
+      'auth/invalid-credential': 'The email or password is incorrect.',
+      'auth/email-already-in-use': 'This email is already registered.',
+      'auth/weak-password': 'Password is too weak; use at least 6 characters.',
+      'auth/too-many-requests': 'Too many unsuccessful attempts. Try again later.',
+      'auth/network-request-failed': 'Could not reach Firebase. Check internet and access to Google services.',
+      'auth/operation-not-allowed': 'Email/password sign-in is not enabled in Firebase.',
+      'auth/unauthorized-domain': 'This domain is not authorized in Firebase.',
+      'auth/invalid-api-key': 'The Firebase API key or configuration is invalid.'
+    };
+    const fallbackFa = action === 'signup' ? 'ساخت حساب انجام نشد.' : action === 'signout' ? 'خروج از حساب انجام نشد.' : 'ورود انجام نشد.';
+    const fallbackEn = action === 'signup' ? 'Account creation failed.' : action === 'signout' ? 'Sign-out failed.' : 'Sign-in failed.';
+    const message = settings.language === 'fa' ? (fa[code] || fallbackFa) : (en[code] || fallbackEn);
+    return code ? `${message} (${code})` : message;
+  }
 function accountSettingsCard() {
   if (cloudUser) {
     return `
@@ -2546,11 +2581,7 @@ function accountSettingsCard() {
   }
 
   function parseNatural(input) {
-    const normalizedInput = String(input).replace(/[۰-۹٠-٩]/g, digit => {
-      const fa = '۰۱۲۳۴۵۶۷۸۹'.indexOf(digit);
-      return String(fa >= 0 ? fa : '٠١٢٣٤٥٦٧٨٩'.indexOf(digit));
-    });
-    const lower = normalizedInput.toLowerCase();
+    const lower = input.toLowerCase();
 
     if (/کارهای باز|کارها.*نشون|show.*tasks|open tasks/.test(lower)) {
       return {type:'list'};
@@ -2562,10 +2593,10 @@ function accountSettingsCard() {
 
     let date = new Date();
 
-    if (/پس.?فردا|day after tomorrow/.test(lower)) {
-      date.setDate(date.getDate()+2);
-    } else if (/فردا|tomorrow/.test(lower)) {
+    if (/فردا|tomorrow/.test(lower)) {
       date.setDate(date.getDate()+1);
+    } else if (/پس.?فردا/.test(lower)) {
+      date.setDate(date.getDate()+2);
     }
 
     let time = '';
@@ -2584,14 +2615,14 @@ function accountSettingsCard() {
         h += 12;
       }
 
-      const minute = Number(tm[2] || 0);
-      if (h >= 0 && h <= 23 && minute >= 0 && minute <= 59) {
-        time = String(h % 24).padStart(2,'0') + ':' + String(minute).padStart(2,'0');
-      }
+      time =
+        String(h%24).padStart(2,'0')+
+        ':'+
+        String(Number(tm[2]||0)).padStart(2,'0');
     }
 
-    let title = normalizedInput.replace(
-      /پس.?فردا|day after tomorrow|فردا|tomorrow|ساعت\s*\d{1,2}(?::\d{2})?\s*(صبح|عصر|شب)?/gi,
+    let title = input.replace(
+      /فردا|tomorrow|پس.?فردا|ساعت\s*\d{1,2}(?::\d{2})?\s*(صبح|عصر|شب)?/gi,
       ''
     ).trim();
 
@@ -2835,15 +2866,10 @@ function accountSettingsCard() {
           if (d.schemaVersion && Number(d.schemaVersion) > 1) {
             throw new Error('Unsupported backup version');
           }
-          const validRecords = list => list.every(item =>
-            item && typeof item === 'object' &&
-            typeof item.title === 'string' &&
-            item.title.trim().length > 0 &&
-            item.title.length <= 500
-          );
+          const validRecords = list => list.every(item => item && typeof item === 'object' && typeof item.id === 'string' && typeof item.title === 'string');
           if (!validRecords(d.tasks) || !validRecords(d.routines)) throw new Error('Invalid backup records');
-          tasks = normalizeRecords(d.tasks);
-          routines = normalizeRecords(d.routines);
+          tasks = d.tasks;
+          routines = d.routines;
           if (d.settings && typeof d.settings === 'object') settings = { ...settings, ...d.settings };
 
           persist();
@@ -3039,12 +3065,7 @@ function accountSettingsCard() {
       } catch (error) {
         console.error('LOKI SIGN UP ERROR:',error);
 
-        showToast(
-          text(
-            'ساخت حساب ناموفق بود. اطلاعات را بررسی کن.',
-            'Account creation failed. Check your details.'
-          )
-        );
+        showToast(firebaseAuthErrorMessage(error, 'signup'));
       }
     }
 
@@ -3060,9 +3081,7 @@ function accountSettingsCard() {
       } catch (error) {
         console.error('LOKI SIGN OUT ERROR:',error);
 
-        showToast(
-          text('خروج از حساب ناموفق بود.','Sign out failed.')
-        );
+        showToast(firebaseAuthErrorMessage(error, 'signout'));
       }
     }
   });
@@ -3105,21 +3124,7 @@ function accountSettingsCard() {
         console.error('LOKI SIGN IN ERROR:',error);
 
         // FIX: Use the actual toast function.
-        const authCode = error?.code || '';
-        const networkFailure = authCode === 'auth/network-request-failed' ||
-          authCode === 'auth/timeout' || !navigator.onLine;
-
-        showToast(
-          networkFailure
-            ? text(
-                'اتصال به سرور ورود Firebase برقرار نشد؛ احتمالاً دسترسی شبکه به سرویس‌های Google محدود است. کد: ' + (authCode || 'network'),
-                'Could not reach Firebase Auth. Network access to Google services may be restricted. Code: ' + (authCode || 'network')
-              )
-            : text(
-                'ورود ناموفق بود. کد خطا: ' + (authCode || 'unknown'),
-                'Sign-in failed. Error code: ' + (authCode || 'unknown')
-              )
-        );
+        showToast(firebaseAuthErrorMessage(error, 'signin'));
       }
     }
   });
