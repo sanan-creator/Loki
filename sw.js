@@ -89,24 +89,24 @@ try {
   );
 }
 
-const CACHE_NAME = 'loki-pwa-v15-stability-audit';
+const CACHE_NAME = 'loki-pwa-v16-stable-core';
 
 // Core app files are required. Icons are cached when present, but a missing
 // optional icon must not prevent the Service Worker from installing.
 const CORE_ASSETS = [
   './',
   './index.html',
-  './styles.css?v=11',
-  './app.js?v=15',
+  './styles.css?v=12',
+  './app.js?v=16',
   './manifest.webmanifest'
 ];
 
 const OPTIONAL_ASSETS = [
-  './icon-192.png?v=11',
-  './icon-512.png?v=11',
-  './icon-maskable-512.png?v=11',
-  './apple-touch-icon.png?v=11',
-  './favicon-64.png?v=11',
+  './icon-192.png?v=12',
+  './icon-512.png?v=12',
+  './icon-maskable-512.png?v=12',
+  './apple-touch-icon.png?v=12',
+  './favicon-64.png?v=12',
   './icon.svg'
 ];
 
@@ -137,19 +137,28 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
 
   event.respondWith(
-    caches.match(event.request).then(cached =>
-      cached || fetch(event.request).then(response => {
+    caches.match(event.request).then(async cached => {
+      if (cached) return cached;
+      try {
+        const response = await fetch(event.request);
         if (
-          response &&
-          response.ok &&
+          response && response.ok &&
           new URL(event.request.url).origin === self.location.origin
         ) {
           const copy = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
         }
-
         return response;
-      })
-    )
+      } catch (error) {
+        // If the user opens a route while offline, return the cached app shell.
+        if (event.request.mode === 'navigate') {
+          return (await caches.match('./index.html')) ||
+            new Response('Loki is offline. Reconnect and try again.', {
+              status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+            });
+        }
+        throw error;
+      }
+    })
   );
 });
