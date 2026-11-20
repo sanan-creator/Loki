@@ -89,20 +89,20 @@ try {
   );
 }
 
-const CACHE_NAME = 'loki-pwa-v15-stability-audit';
+const CACHE_NAME = 'loki-pwa-v17-backend-foundation';
 
 // Core app files are required. Icons are cached when present, but a missing
 // optional icon must not prevent the Service Worker from installing.
 const CORE_ASSETS = [
   './',
   './index.html',
-  './styles.css?v=11',
-  './app.js?v=15',
+  './styles.css?v=13',
+  './app.js?v=17',
   './manifest.webmanifest'
 ];
 
 const OPTIONAL_ASSETS = [
-  './icon-192.png?v=11',
+  './icon-192.png?v=13',
   './icon-512.png?v=11',
   './icon-maskable-512.png?v=11',
   './apple-touch-icon.png?v=11',

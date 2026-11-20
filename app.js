@@ -1782,6 +1782,15 @@
     try {
       const {auth} = await ensureFirebaseServices();
 
+      // Keep browser sessions stable across reloads. If the browser blocks
+      // persistence, continue with Firebase's default behavior rather than
+      // preventing authentication from initializing.
+      try {
+        await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+      } catch (persistenceError) {
+        console.warn('Loki auth persistence could not be set to LOCAL:', persistenceError);
+      }
+
       auth.onAuthStateChanged(async user => {
         const transitionId = ++authTransitionId;
         const nextUid = user ? String(user.uid) : null;
@@ -1947,7 +1956,10 @@
       'auth/network-request-failed': 'ارتباط با سرور Firebase برقرار نشد؛ اتصال اینترنت و دسترسی به سرویس‌های Google را بررسی کن.',
       'auth/operation-not-allowed': 'ورود با ایمیل و رمز عبور در Firebase فعال نیست.',
       'auth/unauthorized-domain': 'دامنه فعلی در Firebase مجاز نشده است.',
-      'auth/invalid-api-key': 'کلید یا تنظیمات Firebase معتبر نیست.'
+      'auth/invalid-api-key': 'کلید یا تنظیمات Firebase معتبر نیست.',
+      'auth/missing-email': 'برای بازیابی، ایمیل حساب را وارد کن.',
+      'auth/invalid-continue-uri': 'تنظیمات لینک بازیابی در Firebase معتبر نیست.',
+      'auth/expired-action-code': 'لینک بازیابی منقضی شده است.'
     };
     const en = {
       'auth/invalid-email': 'The email address is invalid.',
@@ -1961,10 +1973,13 @@
       'auth/network-request-failed': 'Could not reach Firebase. Check internet and access to Google services.',
       'auth/operation-not-allowed': 'Email/password sign-in is not enabled in Firebase.',
       'auth/unauthorized-domain': 'This domain is not authorized in Firebase.',
-      'auth/invalid-api-key': 'The Firebase API key or configuration is invalid.'
+      'auth/invalid-api-key': 'The Firebase API key or configuration is invalid.',
+      'auth/missing-email': 'Enter the account email to reset the password.',
+      'auth/invalid-continue-uri': 'The Firebase password-reset link configuration is invalid.',
+      'auth/expired-action-code': 'The password-reset link has expired.'
     };
-    const fallbackFa = action === 'signup' ? 'ساخت حساب انجام نشد.' : action === 'signout' ? 'خروج از حساب انجام نشد.' : 'ورود انجام نشد.';
-    const fallbackEn = action === 'signup' ? 'Account creation failed.' : action === 'signout' ? 'Sign-out failed.' : 'Sign-in failed.';
+    const fallbackFa = action === 'signup' ? 'ساخت حساب انجام نشد.' : action === 'signout' ? 'خروج از حساب انجام نشد.' : action === 'reset' ? 'ارسال لینک بازیابی انجام نشد.' : 'ورود انجام نشد.';
+    const fallbackEn = action === 'signup' ? 'Account creation failed.' : action === 'signout' ? 'Sign-out failed.' : action === 'reset' ? 'Could not send the password reset email.' : 'Sign-in failed.';
     const message = settings.language === 'fa' ? (fa[code] || fallbackFa) : (en[code] || fallbackEn);
     return code ? `${message} (${code})` : message;
   }
@@ -2040,6 +2055,16 @@ function accountSettingsCard() {
             id="lokiTogglePassword"
           >
             ${text('نمایش','Show')}
+          </button>
+        </div>
+
+        <div class="setting-row">
+          <button
+            class="secondary-btn"
+            type="button"
+            id="lokiPasswordReset"
+          >
+            ${text('فراموشی رمز عبور','Forgot password')}
           </button>
         </div>
 
@@ -3034,6 +3059,24 @@ function accountSettingsCard() {
       URL.revokeObjectURL(a.href);
     }
 
+    if (e.target.id==='lokiPasswordReset') {
+      const email = $('#lokiAuthEmail')?.value.trim();
+      if (!email) {
+        showToast(text('ابتدا ایمیل حساب را وارد کن.','Enter your account email first.'));
+        $('#lokiAuthEmail')?.focus();
+        return;
+      }
+      try {
+        await ensureFirebaseServices();
+        await firebaseAuthInstance.sendPasswordResetEmail(email);
+        showToast(text('لینک بازیابی رمز عبور برای ایمیل ارسال شد.','Password reset email sent.'));
+      } catch (error) {
+        console.error('LOKI PASSWORD RESET ERROR:', error);
+        showToast(firebaseAuthErrorMessage(error, 'reset'));
+      }
+      return;
+    }
+
     if (e.target.id==='lokiSignUp') {
       const email = $('#lokiAuthEmail')?.value.trim();
       const password = $('#lokiAuthPassword')?.value;
@@ -3050,6 +3093,7 @@ function accountSettingsCard() {
       }
 
       try {
+        localStorage.setItem('loki_saved_auth_email_v1', email);
         await ensureFirebaseServices();
 
         await firebaseAuthInstance
@@ -3107,6 +3151,7 @@ function accountSettingsCard() {
       const password = $('#lokiAuthPassword').value;
 
       try {
+        localStorage.setItem('loki_saved_auth_email_v1', email);
         await ensureFirebaseServices();
 
         await firebaseAuthInstance
