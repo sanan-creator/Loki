@@ -70,12 +70,11 @@
   };
 
   const THEME_PRESETS = {
-    loki: { nameFa: 'Loki', nameEn: 'Loki', descriptionFa: 'زمردی و طلایی؛ هویت اصلی Loki', descriptionEn: 'Emerald and gold; the original Loki identity' },
-    spider: { nameFa: 'Spider', nameEn: 'Spider', descriptionFa: 'قرمز، آبی و مشکی با درخشش نئونی', descriptionEn: 'Red, blue and black with neon energy' },
-    cyber: { nameFa: 'Neon Pulse', nameEn: 'Neon Pulse', descriptionFa: 'بنفش و سرخابی با حال‌وهوای سایبر', descriptionEn: 'Purple and magenta cyber atmosphere' },
-    obsidian: { nameFa: 'Obsidian', nameEn: 'Obsidian', descriptionFa: 'مشکی عمیق با جزئیات کهربایی', descriptionEn: 'Deep black with amber accents' },
-    pearl: { nameFa: 'Pearl', nameEn: 'Pearl', descriptionFa: 'روشن، مینیمال و نقره‌ای', descriptionEn: 'Bright, minimal and silver' },
-    arctic: { nameFa: 'Arctic', nameEn: 'Arctic', descriptionFa: 'آبی یخی و سرمه‌ای', descriptionEn: 'Ice blue and midnight navy' }
+    loki: { nameFa: 'Loki', nameEn: 'Loki', descriptionFa: 'زمردی و طلایی', descriptionEn: 'Emerald and gold' },
+    spider: { nameFa: 'تم 1', nameEn: 'Theme 1', descriptionFa: 'قرمز، آبی و مشکی با درخشش نئونی', descriptionEn: 'Red, blue and black with neon energy' },
+    cyber: { nameFa: 'تم 2', nameEn: 'Theme 2', descriptionFa: 'بنفش و سرخابی با حال‌وهوای سایبر', descriptionEn: 'Purple and magenta cyber atmosphere' },
+    obsidian: { nameFa: 'تم 3', nameEn: 'Theme 3', descriptionFa: 'مشکی عمیق با جزئیات کهربایی', descriptionEn: 'Deep black with amber accents' },
+    arctic: { nameFa: 'تم 4', nameEn: 'Theme 4', descriptionFa: 'آبی یخی و سرمه‌ای', descriptionEn: 'Ice blue and midnight navy' }
   };
 
   let settings = read(KEYS.settings, {
@@ -85,8 +84,21 @@
     language: 'fa'
   });
   if (!settings || typeof settings !== 'object' || Array.isArray(settings)) settings = { theme: 'dark', themeId: 'loki', themeModes: {}, language: 'fa' };
-  if (!THEME_PRESETS[settings.themeId]) settings.themeId = settings.theme === 'light' ? 'pearl' : 'loki';
   if (!settings.themeModes || typeof settings.themeModes !== 'object' || Array.isArray(settings.themeModes)) settings.themeModes = {};
+  // One-time compatibility migration: Pearl was removed; carry its selected mode to Arctic.
+  if (settings.themeId === 'pearl') {
+    if (!['dark', 'light'].includes(settings.themeModes.arctic) && ['dark', 'light'].includes(settings.themeModes.pearl)) {
+      settings.themeModes.arctic = settings.themeModes.pearl;
+    }
+    settings.themeId = 'arctic';
+  }
+  if (!settings.themeId || !THEME_PRESETS[settings.themeId]) {
+    settings.themeId = 'loki';
+    if (!['dark', 'light'].includes(settings.themeModes.loki) && settings.theme === 'light') {
+      settings.themeModes.loki = 'light';
+    }
+  }
+  delete settings.themeModes.pearl;
   for (const id of Object.keys(THEME_PRESETS)) {
     if (!['dark', 'light'].includes(settings.themeModes[id])) settings.themeModes[id] = (id === settings.themeId && settings.theme === 'light') ? 'light' : 'dark';
   }
@@ -144,7 +156,6 @@
       spider: mode === 'dark' ? '#080a14' : '#f2f5ff',
       cyber: mode === 'dark' ? '#10091b' : '#fbf2ff',
       obsidian: mode === 'dark' ? '#090909' : '#f6f3ed',
-      pearl: mode === 'dark' ? '#111923' : '#edf2f6',
       arctic: mode === 'dark' ? '#071827' : '#edf8fc'
     })[themeId];
   }
@@ -167,12 +178,13 @@
   function selectThemeMode(mode) {
     if (!['dark', 'light'].includes(mode)) return;
     if (!settings.themeModes || typeof settings.themeModes !== 'object') settings.themeModes = {};
+    const currentMode = settings.themeModes[settings.themeId] === 'light' ? 'light' : 'dark';
+    if (currentMode === mode) return;
     settings.themeModes[settings.themeId] = mode;
     settings.theme = mode;
     applyTheme();
     persist();
     render();
-    showToast(text(mode === 'dark' ? 'حالت تاریک فعال شد.' : 'حالت روشن فعال شد.', mode === 'dark' ? 'Dark mode enabled.' : 'Light mode enabled.'));
   }
 
   function read(k, fallback) {
@@ -3049,20 +3061,15 @@ function accountSettingsCard() {
 
   // This handler owns the settings and account actions that use await.
   $('#page').addEventListener('click', async e => {
-    const themeChoice = e.target.closest('[data-theme-choice]');
-    if (themeChoice) {
+    const clickedElement = e.target instanceof Element ? e.target : null;
+    const themeChoice = clickedElement?.closest('button[data-theme-choice]');
+    if (themeChoice && $('#page').contains(themeChoice)) {
       selectTheme(themeChoice.dataset.themeChoice);
       return;
     }
-    const themeMode = e.target.closest('[data-theme-mode]');
-    if (themeMode) {
+    const themeMode = clickedElement?.closest('.theme-mode-switch button[data-theme-mode]');
+    if (themeMode && $('#page').contains(themeMode)) {
       selectThemeMode(themeMode.dataset.themeMode);
-      return;
-    }
-
-    if (e.target.closest('#settingTheme')) {
-      $('#themeBtn').click();
-      render();
       return;
     }
 

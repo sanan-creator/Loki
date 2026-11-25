@@ -89,7 +89,7 @@ try {
   );
 }
 
-const CACHE_NAME = 'loki-pwa-v4-theme-engine';
+const CACHE_NAME = 'loki-cache-theme-labels-v4';
 
 // Core app files are required. Icons are cached when present, but a missing
 // optional icon must not prevent the Service Worker from installing.
