@@ -89,15 +89,15 @@ try {
   );
 }
 
-const CACHE_NAME = 'loki-pwa-v17-backend-foundation';
+const CACHE_NAME = 'loki-pwa-v18-theme-engine';
 
 // Core app files are required. Icons are cached when present, but a missing
 // optional icon must not prevent the Service Worker from installing.
 const CORE_ASSETS = [
   './',
   './index.html',
-  './styles.css?v=13',
-  './app.js?v=17',
+  './styles.css?v=14',
+  './app.js?v=18',
   './manifest.webmanifest'
 ];
 

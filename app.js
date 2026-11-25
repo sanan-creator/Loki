@@ -26,7 +26,7 @@
       tasks:'کارها',
       routines:'روتین‌ها',
       calendar:'تقویم شمسی',
-      assistant:'دستیار',
+      assistant:'Jarvis',
       settings:'تنظیمات',
       localStorage:'ذخیره‌سازی محلی فعال',
       yourWorkspace:'فضای شخصی شما',
@@ -50,7 +50,7 @@
       tasks:'Tasks',
       routines:'Routines',
       calendar:'Persian calendar',
-      assistant:'Assistant',
+      assistant:'Jarvis',
       settings:'Settings',
       localStorage:'Local storage active',
       yourWorkspace:'Your workspace',
@@ -69,10 +69,23 @@
     }
   };
 
+  const THEME_PRESETS = {
+    loki: { nameFa: 'Loki', nameEn: 'Loki', descriptionFa: 'زمردی و طلایی؛ هویت اصلی Loki', descriptionEn: 'Emerald and gold; the original Loki identity' },
+    spider: { nameFa: 'Spider', nameEn: 'Spider', descriptionFa: 'قرمز، آبی و مشکی با درخشش نئونی', descriptionEn: 'Red, blue and black with neon energy' },
+    cyber: { nameFa: 'Neon Pulse', nameEn: 'Neon Pulse', descriptionFa: 'بنفش و سرخابی با حال‌وهوای سایبر', descriptionEn: 'Purple and magenta cyber atmosphere' },
+    obsidian: { nameFa: 'Obsidian', nameEn: 'Obsidian', descriptionFa: 'مشکی عمیق با جزئیات کهربایی', descriptionEn: 'Deep black with amber accents' },
+    pearl: { nameFa: 'Pearl', nameEn: 'Pearl', descriptionFa: 'روشن، مینیمال و نقره‌ای', descriptionEn: 'Bright, minimal and silver' },
+    arctic: { nameFa: 'Arctic', nameEn: 'Arctic', descriptionFa: 'آبی یخی و سرمه‌ای', descriptionEn: 'Ice blue and midnight navy' }
+  };
+
   let settings = read(KEYS.settings, {
     theme: 'dark',
+    themeId: 'loki',
     language: 'fa'
   });
+  if (!settings || typeof settings !== 'object' || Array.isArray(settings)) settings = { theme: 'dark', themeId: 'loki', language: 'fa' };
+  if (!THEME_PRESETS[settings.themeId]) settings.themeId = settings.theme === 'light' ? 'pearl' : 'loki';
+  if (!['fa', 'en'].includes(settings.language)) settings.language = 'fa';
   let settingsUpdatedAt = Number(localStorage.getItem('loki_settings_updated_at_v1')) || Date.now();
   let persistedSettingsJson = JSON.stringify(settings);
 
@@ -109,6 +122,29 @@
 
   const text = (faText, enText) =>
     settings.language === 'fa' ? faText : enText;
+
+  function applyTheme() {
+    if (!THEME_PRESETS[settings.themeId]) settings.themeId = settings.theme === 'light' ? 'pearl' : 'loki';
+    const themeId = settings.themeId;
+    document.body.dataset.theme = themeId;
+    document.body.classList.toggle('light', themeId === 'pearl');
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) metaTheme.content = ({
+      loki: '#020905', spider: '#080a14', cyber: '#10091b',
+      obsidian: '#090909', pearl: '#edf2f6', arctic: '#071827'
+    })[themeId];
+  }
+
+  function selectTheme(themeId) {
+    if (!THEME_PRESETS[themeId] || settings.themeId === themeId) return;
+    settings.themeId = themeId;
+    settings.theme = themeId === 'pearl' ? 'light' : 'dark';
+    applyTheme();
+    persist();
+    render();
+    const preset = THEME_PRESETS[themeId];
+    showToast(text(`تم ${preset.nameFa} فعال شد.`, `${preset.nameEn} theme activated.`));
+  }
 
   function read(k, fallback) {
     try {
@@ -739,7 +775,7 @@
       tasks:text('کارها','Tasks'),
       routines:text('روتین‌های ثابت','Fixed routines'),
       calendar:text('تقویم شمسی','Persian calendar'),
-      assistant:text('دستیار','Assistant'),
+      assistant:'Jarvis',
       settings:text('تنظیمات','Settings')
     })[page];
 
@@ -1287,9 +1323,9 @@
       <div class="assistant-box">
         <div class="assistant-intro">
           <div class="assistant-orb">✧</div>
-          <div class="eyebrow">LOKI</div>
+          <div class="eyebrow">JARVIS / PERSONAL ASSISTANT</div>
 
-          <h2>${text('دستیار آماده کمک است','Ready to help')}</h2>
+          <h2>Jarvis</h2>
 
           <p>
             ${text(
@@ -1311,7 +1347,7 @@
         <form class="chat-form" id="chatForm">
           <input
             id="chatInput"
-            placeholder="${text('به Loki بگو چه کاری داری...','Tell Loki what you need to do...')}"
+            placeholder="${text('به Jarvis بگو چه کاری داری...','Tell Jarvis what you need to do...')}"
           >
 
           <button class="primary-btn">
@@ -1854,7 +1890,7 @@
                   tasks = [];
                   routines = [];
                   deletions = [];
-                  settings = { theme: 'dark', language: 'fa' };
+                  settings = { theme: 'dark', themeId: 'loki', language: 'fa' };
                   settingsUpdatedAt = Date.now();
                   persistedSettingsJson = JSON.stringify(settings);
                   localStorage.setItem('loki_settings_updated_at_v1', String(settingsUpdatedAt));
@@ -1872,7 +1908,7 @@
                 tasks = [];
                 routines = [];
                 deletions = [];
-                settings = { theme: 'dark', language: 'fa' };
+                settings = { theme: 'dark', themeId: 'loki', language: 'fa' };
                 settingsUpdatedAt = Date.now();
                 persistedSettingsJson = JSON.stringify(settings);
                 localStorage.setItem('loki_settings_updated_at_v1', String(settingsUpdatedAt));
@@ -1915,7 +1951,7 @@
             tasks = [];
             routines = [];
             deletions = [];
-            settings = { theme: 'dark', language: 'fa' };
+            settings = { theme: 'dark', themeId: 'loki', language: 'fa' };
             settingsUpdatedAt = Date.now();
             persistedSettingsJson = JSON.stringify(settings);
             localStorage.setItem('loki_settings_updated_at_v1', String(settingsUpdatedAt));
@@ -1926,7 +1962,7 @@
 
         if (transitionId !== authTransitionId) return;
         authWorkspaceReady = true;
-        document.body.classList.toggle('light', settings.theme === 'light');
+        applyTheme();
         render();
       });
 
@@ -2107,15 +2143,18 @@ function accountSettingsCard() {
             )}
           </p>
 
-          <div class="setting-row">
-            <span>${text('تم روشن / تاریک','Light / dark theme')}</span>
-
-            <button class="secondary-btn" id="settingTheme">
-              ${settings.theme==='dark'
-                ?text('تاریک','Dark')
-                :text('روشن','Light')}
-            </button>
+          <div class="theme-grid" role="group" aria-label="${text('انتخاب تم','Choose a theme')}">
+            ${Object.entries(THEME_PRESETS).map(([id, preset]) => `
+              <button type="button" class="theme-option theme-${id} ${settings.themeId === id ? 'selected' : ''}"
+                data-theme-choice="${id}" aria-pressed="${settings.themeId === id}">
+                <span class="theme-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="theme-option-copy"><strong>${settings.language === 'fa' ? preset.nameFa : preset.nameEn}</strong>
+                <small>${settings.language === 'fa' ? preset.descriptionFa : preset.descriptionEn}</small></span>
+                <span class="theme-check" aria-hidden="true">${settings.themeId === id ? '✓' : ''}</span>
+              </button>
+            `).join('')}
           </div>
+          <p class="theme-sync-note">${text('انتخاب تم فقط برای حساب خودت ذخیره می‌شود و روی ظاهر دیگر کاربران اثری ندارد.','Your theme preference is saved to your account and does not affect other users.')}</p>
         </div>
 
         <div class="setting-card">
@@ -2941,15 +2980,9 @@ function accountSettingsCard() {
   });
 
   $('#themeBtn').addEventListener('click',()=>{
-    settings.theme =
-      settings.theme==='dark'?'light':'dark';
-
-    document.body.classList.toggle(
-      'light',
-      settings.theme==='light'
-    );
-
-    persist();
+    const ids = Object.keys(THEME_PRESETS);
+    const current = ids.indexOf(settings.themeId);
+    selectTheme(ids[(current + 1) % ids.length]);
   });
 
   // Keep delegated listeners registered once; #page content is re-rendered.
@@ -2981,6 +3014,12 @@ function accountSettingsCard() {
 
   // This handler owns the settings and account actions that use await.
   $('#page').addEventListener('click', async e => {
+    const themeChoice = e.target.closest('[data-theme-choice]');
+    if (themeChoice) {
+      selectTheme(themeChoice.dataset.themeChoice);
+      return;
+    }
+
     if (e.target.closest('#settingTheme')) {
       $('#themeBtn').click();
       render();
@@ -3174,10 +3213,7 @@ function accountSettingsCard() {
     }
   });
 
-  document.body.classList.toggle(
-    'light',
-    settings.theme==='light'
-  );
+  applyTheme();
 
   applyLanguage();
   render();
@@ -3188,7 +3224,7 @@ function accountSettingsCard() {
   (async () => {
     const restored = await restoreIndexedSnapshot();
     if (restored) {
-      document.body.classList.toggle('light', settings.theme === 'light');
+      applyTheme();
       applyLanguage();
       render();
     } else {
