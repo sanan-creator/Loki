@@ -81,10 +81,15 @@
   let settings = read(KEYS.settings, {
     theme: 'dark',
     themeId: 'loki',
+    themeModes: {},
     language: 'fa'
   });
-  if (!settings || typeof settings !== 'object' || Array.isArray(settings)) settings = { theme: 'dark', themeId: 'loki', language: 'fa' };
+  if (!settings || typeof settings !== 'object' || Array.isArray(settings)) settings = { theme: 'dark', themeId: 'loki', themeModes: {}, language: 'fa' };
   if (!THEME_PRESETS[settings.themeId]) settings.themeId = settings.theme === 'light' ? 'pearl' : 'loki';
+  if (!settings.themeModes || typeof settings.themeModes !== 'object' || Array.isArray(settings.themeModes)) settings.themeModes = {};
+  for (const id of Object.keys(THEME_PRESETS)) {
+    if (!['dark', 'light'].includes(settings.themeModes[id])) settings.themeModes[id] = (id === settings.themeId && settings.theme === 'light') ? 'light' : 'dark';
+  }
   if (!['fa', 'en'].includes(settings.language)) settings.language = 'fa';
   let settingsUpdatedAt = Number(localStorage.getItem('loki_settings_updated_at_v1')) || Date.now();
   let persistedSettingsJson = JSON.stringify(settings);
@@ -124,26 +129,50 @@
     settings.language === 'fa' ? faText : enText;
 
   function applyTheme() {
-    if (!THEME_PRESETS[settings.themeId]) settings.themeId = settings.theme === 'light' ? 'pearl' : 'loki';
+    if (!THEME_PRESETS[settings.themeId]) settings.themeId = 'loki';
+    if (!settings.themeModes || typeof settings.themeModes !== 'object') settings.themeModes = {};
     const themeId = settings.themeId;
+    const mode = settings.themeModes[themeId] === 'light' ? 'light' : 'dark';
+    settings.themeModes[themeId] = mode;
+    settings.theme = mode;
     document.body.dataset.theme = themeId;
-    document.body.classList.toggle('light', themeId === 'pearl');
+    document.body.dataset.themeMode = mode;
+    document.body.classList.toggle('light', mode === 'light');
     const metaTheme = document.querySelector('meta[name="theme-color"]');
     if (metaTheme) metaTheme.content = ({
-      loki: '#020905', spider: '#080a14', cyber: '#10091b',
-      obsidian: '#090909', pearl: '#edf2f6', arctic: '#071827'
+      loki: mode === 'dark' ? '#020905' : '#eef8f2',
+      spider: mode === 'dark' ? '#080a14' : '#f2f5ff',
+      cyber: mode === 'dark' ? '#10091b' : '#fbf2ff',
+      obsidian: mode === 'dark' ? '#090909' : '#f6f3ed',
+      pearl: mode === 'dark' ? '#111923' : '#edf2f6',
+      arctic: mode === 'dark' ? '#071827' : '#edf8fc'
     })[themeId];
   }
 
   function selectTheme(themeId) {
-    if (!THEME_PRESETS[themeId] || settings.themeId === themeId) return;
+    if (!THEME_PRESETS[themeId]) return;
+    if (!settings.themeModes || typeof settings.themeModes !== 'object') settings.themeModes = {};
+    if (!settings.themeModes[themeId]) settings.themeModes[themeId] = 'dark';
+    const changed = settings.themeId !== themeId;
     settings.themeId = themeId;
-    settings.theme = themeId === 'pearl' ? 'light' : 'dark';
     applyTheme();
     persist();
     render();
-    const preset = THEME_PRESETS[themeId];
-    showToast(text(`تم ${preset.nameFa} فعال شد.`, `${preset.nameEn} theme activated.`));
+    if (changed) {
+      const preset = THEME_PRESETS[themeId];
+      showToast(text(`تم ${preset.nameFa} فعال شد.`, `${preset.nameEn} theme activated.`));
+    }
+  }
+
+  function selectThemeMode(mode) {
+    if (!['dark', 'light'].includes(mode)) return;
+    if (!settings.themeModes || typeof settings.themeModes !== 'object') settings.themeModes = {};
+    settings.themeModes[settings.themeId] = mode;
+    settings.theme = mode;
+    applyTheme();
+    persist();
+    render();
+    showToast(text(mode === 'dark' ? 'حالت تاریک فعال شد.' : 'حالت روشن فعال شد.', mode === 'dark' ? 'Dark mode enabled.' : 'Light mode enabled.'));
   }
 
   function read(k, fallback) {
@@ -1890,7 +1919,7 @@
                   tasks = [];
                   routines = [];
                   deletions = [];
-                  settings = { theme: 'dark', themeId: 'loki', language: 'fa' };
+                  settings = { theme: 'dark', themeId: 'loki', themeModes: { loki: 'dark', spider: 'dark', cyber: 'dark', obsidian: 'dark', pearl: 'dark', arctic: 'dark' }, language: 'fa' };
                   settingsUpdatedAt = Date.now();
                   persistedSettingsJson = JSON.stringify(settings);
                   localStorage.setItem('loki_settings_updated_at_v1', String(settingsUpdatedAt));
@@ -1908,7 +1937,7 @@
                 tasks = [];
                 routines = [];
                 deletions = [];
-                settings = { theme: 'dark', themeId: 'loki', language: 'fa' };
+                settings = { theme: 'dark', themeId: 'loki', themeModes: { loki: 'dark', spider: 'dark', cyber: 'dark', obsidian: 'dark', pearl: 'dark', arctic: 'dark' }, language: 'fa' };
                 settingsUpdatedAt = Date.now();
                 persistedSettingsJson = JSON.stringify(settings);
                 localStorage.setItem('loki_settings_updated_at_v1', String(settingsUpdatedAt));
@@ -1951,7 +1980,7 @@
             tasks = [];
             routines = [];
             deletions = [];
-            settings = { theme: 'dark', themeId: 'loki', language: 'fa' };
+            settings = { theme: 'dark', themeId: 'loki', themeModes: { loki: 'dark', spider: 'dark', cyber: 'dark', obsidian: 'dark', pearl: 'dark', arctic: 'dark' }, language: 'fa' };
             settingsUpdatedAt = Date.now();
             persistedSettingsJson = JSON.stringify(settings);
             localStorage.setItem('loki_settings_updated_at_v1', String(settingsUpdatedAt));
@@ -2154,7 +2183,14 @@ function accountSettingsCard() {
               </button>
             `).join('')}
           </div>
-          <p class="theme-sync-note">${text('انتخاب تم فقط برای حساب خودت ذخیره می‌شود و روی ظاهر دیگر کاربران اثری ندارد.','Your theme preference is saved to your account and does not affect other users.')}</p>
+          <div class="theme-mode-row">
+            <span>${text('حالت نمایش این تم','Appearance mode for this theme')}</span>
+            <div class="theme-mode-switch" role="group" aria-label="${text('حالت روشن یا تاریک','Light or dark mode')}">
+              <button type="button" data-theme-mode="dark" class="${settings.themeModes[settings.themeId] !== 'light' ? 'active' : ''}" aria-pressed="${settings.themeModes[settings.themeId] !== 'light'}">◐ ${text('دارک','Dark')}</button>
+              <button type="button" data-theme-mode="light" class="${settings.themeModes[settings.themeId] === 'light' ? 'active' : ''}" aria-pressed="${settings.themeModes[settings.themeId] === 'light'}">☼ ${text('لایت','Light')}</button>
+            </div>
+          </div>
+          <p class="theme-sync-note">${text('حالت روشن و تاریک هر تم جداگانه ذخیره می‌شود؛ تغییر آن فقط روی حساب خودت اثر دارد.','Each theme remembers its own light/dark mode. Your choice affects only your account.')}</p>
         </div>
 
         <div class="setting-card">
@@ -2980,9 +3016,8 @@ function accountSettingsCard() {
   });
 
   $('#themeBtn').addEventListener('click',()=>{
-    const ids = Object.keys(THEME_PRESETS);
-    const current = ids.indexOf(settings.themeId);
-    selectTheme(ids[(current + 1) % ids.length]);
+    const currentMode = settings.themeModes && settings.themeModes[settings.themeId] === 'light' ? 'light' : 'dark';
+    selectThemeMode(currentMode === 'dark' ? 'light' : 'dark');
   });
 
   // Keep delegated listeners registered once; #page content is re-rendered.
@@ -3017,6 +3052,11 @@ function accountSettingsCard() {
     const themeChoice = e.target.closest('[data-theme-choice]');
     if (themeChoice) {
       selectTheme(themeChoice.dataset.themeChoice);
+      return;
+    }
+    const themeMode = e.target.closest('[data-theme-mode]');
+    if (themeMode) {
+      selectThemeMode(themeMode.dataset.themeMode);
       return;
     }
 
